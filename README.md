@@ -146,7 +146,3 @@ Key properties in `backend/src/main/resources/application.properties`:
 | `codearena.admin.key` | dev default | `X-Admin-Key` for admin API |
 
 ---
-
-## 📄 License
-
-Released under the MIT License. See `LICENSE` (add one if you plan to publish).
