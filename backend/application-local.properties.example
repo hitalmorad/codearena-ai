@@ -1,0 +1,5 @@
+# Template for local secrets. Copy this file to "application-local.properties"
+# (in the same folder, next to pom.xml) and paste your real key after the = sign.
+# The copy named "application-local.properties" is git-ignored, so your key
+# never gets committed. This .example file is safe to commit.
+codearena.ai.groq.api-key=your-groq-key-here
