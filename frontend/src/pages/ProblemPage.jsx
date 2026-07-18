@@ -329,7 +329,7 @@ export default function ProblemPage() {
         <div className="flex h-[38%] min-h-[180px] flex-col border-t border-white/10 bg-ink-900/80">
           <div className="flex items-center justify-between border-b border-white/5 px-4 py-2">
             <span className="text-sm font-semibold text-zinc-300">Console</span>
-            {result && (
+            {result && !result.contestMode && (
               <span className="text-xs text-zinc-500">
                 <span className="font-semibold text-zinc-300">{result.passedTests}</span>/
                 {result.totalTests} passed
@@ -356,13 +356,15 @@ export default function ProblemPage() {
                 <motion.div key="result" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
                   <div className="flex flex-wrap items-center gap-3">
                     <VerdictBadge verdict={result.verdict} />
-                    <span className="text-xs text-zinc-500">
-                      <span className="font-semibold text-zinc-300">{result.passedTests}</span>/
-                      {result.totalTests} {action === 'run' ? 'samples' : 'tests'} passed
-                      {result.runtimeMs != null && <span className="ml-2">· {result.runtimeMs}ms</span>}
-                    </span>
+                    {!result.contestMode && (
+                      <span className="text-xs text-zinc-500">
+                        <span className="font-semibold text-zinc-300">{result.passedTests}</span>/
+                        {result.totalTests} {action === 'run' ? 'samples' : 'tests'} passed
+                        {result.runtimeMs != null && <span className="ml-2">· {result.runtimeMs}ms</span>}
+                      </span>
+                    )}
                     {result.contestMode && (
-                      <span className="chip !text-accent-amber text-[10px]">contest · hidden tests</span>
+                      <span className="chip !text-accent-amber text-[10px]">contest · result hidden</span>
                     )}
                   </div>
 

@@ -101,22 +101,48 @@ public class SubmissionService {
     /**
      * Builds the client report, deciding which case details to reveal.
      *
-     * @param revealAll  reveal every case (used for "Run" on sample cases)
+     * <ul>
+     *   <li><b>Run</b> ({@code revealAll}): every sample case is shown.</li>
+     *   <li><b>Practice submit</b>: sample cases and the single failing case are
+     *       revealed (LeetCode-style), with the full passed/total count.</li>
+     *   <li><b>Contest submit</b>: no per-case data at all — only the overall
+     *       verdict as a plain message (e.g. "Wrong Answer"), like Codeforces.</li>
+     * </ul>
+     *
+     * @param revealAll reveal every case (used for "Run" on sample cases)
      */
     private JudgeReportDto report(JudgeResult r, boolean contestMode, boolean revealAll) {
         List<JudgeReportDto.CaseView> views = new ArrayList<>();
-        for (CaseResult c : r.cases()) {
-            // Practice: show sample cases and the failing case. Contest: hide all I/O.
-            boolean reveal = revealAll || (!contestMode && (c.sample() || !c.passed()));
-            views.add(new JudgeReportDto.CaseView(
-                    c.index(), c.sample(), c.passed(), c.verdict(),
-                    reveal ? c.input() : null,
-                    reveal ? c.expectedOutput() : null,
-                    reveal ? c.actualOutput() : null,
-                    c.runtimeMs()));
+        if (!contestMode) {
+            for (CaseResult c : r.cases()) {
+                // Run: show every sample case. Practice submit: show ONLY the
+                // failing case (the passed/total count conveys the rest).
+                boolean include = revealAll || !c.passed();
+                if (!include) {
+                    continue;
+                }
+                views.add(new JudgeReportDto.CaseView(
+                        c.index(), c.sample(), c.passed(), c.verdict(),
+                        c.input(), c.expectedOutput(), c.actualOutput(), c.runtimeMs()));
+            }
         }
+        // In a live contest we expose nothing about the tests — just the verdict.
+        String message = contestMode ? contestMessage(r.verdict()) : r.message();
         return new JudgeReportDto(r.verdict().name(), r.passedTests(), r.totalTests(),
-                r.runtimeMs(), r.message(), contestMode, views);
+                r.runtimeMs(), message, contestMode, views);
+    }
+
+    /** A test-data-free verdict message shown during contests. */
+    private String contestMessage(Verdict v) {
+        return switch (v) {
+            case ACCEPTED -> "Accepted";
+            case WRONG_ANSWER -> "Wrong Answer";
+            case TIME_LIMIT_EXCEEDED -> "Time Limit Exceeded";
+            case MEMORY_LIMIT_EXCEEDED -> "Memory Limit Exceeded";
+            case RUNTIME_ERROR -> "Runtime Error";
+            case COMPILATION_ERROR -> "Compilation Error";
+            default -> "Rejected";
+        };
     }
 
     private boolean hasText(String s) {

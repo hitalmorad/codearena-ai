@@ -7,6 +7,7 @@ import com.codearena.dto.StandingRowDto;
 import com.codearena.model.Contest;
 import com.codearena.model.ContestEntry;
 import com.codearena.model.Problem;
+import com.codearena.model.Role;
 import com.codearena.model.User;
 import com.codearena.realtime.SseHub;
 import com.codearena.repository.ContestEntryRepository;
@@ -19,8 +20,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class ContestService {
@@ -79,6 +82,10 @@ public class ContestService {
             throw new IllegalStateException("Contest has already ended");
         }
         User user = userService.requireByUsername(username);
+        if (user.getRole() == Role.ADMIN) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Admins can create contests but cannot participate in them.");
+        }
         if (entryRepository.findByContestIdAndUserId(id, user.getId()).isEmpty()) {
             entryRepository.save(new ContestEntry(c, user));
             broadcastStandings(c);

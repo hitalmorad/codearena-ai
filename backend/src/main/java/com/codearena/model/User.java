@@ -41,6 +41,10 @@ public class User {
     @Column(nullable = false, unique = true)
     private String username;
 
+    /** Email address; used to grant admin access via the configured allowlist. */
+    @Column(unique = true)
+    private String email;
+
     /** PBKDF2 hash ("salt:hash"). Null for display-only demo accounts. */
     @Column
     private String passwordHash;
@@ -63,6 +67,11 @@ public class User {
 
     @Column(nullable = false)
     private int problemsSolved = 0;
+
+    /** Hidden weighted problem-solving score, used only for global ranking. */
+    @Column(nullable = false)
+    @ColumnDefault("0")
+    private int score = 0;
 
     /** IDs of problems this user has solved at least once (global, all-time). */
     @ElementCollection(fetch = FetchType.EAGER)

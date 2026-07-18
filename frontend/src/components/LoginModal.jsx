@@ -1,11 +1,14 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
 import { useUser } from '../context/UserContext.jsx'
 
 export default function LoginModal({ open, onClose }) {
   const { login, register } = useUser()
+  const navigate = useNavigate()
   const [mode, setMode] = useState('login') // 'login' | 'register'
   const [username, setUsername] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -19,6 +22,10 @@ export default function LoginModal({ open, onClose }) {
       setError('Username: 2–20 chars (letters, numbers, underscores).')
       return
     }
+    if (isRegister && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setError('Please enter a valid email address.')
+      return
+    }
     if (password.length < 4) {
       setError('Password must be at least 4 characters.')
       return
@@ -26,10 +33,12 @@ export default function LoginModal({ open, onClose }) {
     setBusy(true)
     setError('')
     try {
-      await (isRegister ? register(name, password) : login(name, password))
+      await (isRegister ? register(name, email, password) : login(name, password))
       setUsername('')
+      setEmail('')
       setPassword('')
       onClose()
+      navigate('/') // land on home, never a stale route from a previous session
     } catch (err) {
       setError(err?.response?.data?.message ?? 'Something went wrong.')
     } finally {
@@ -70,6 +79,15 @@ export default function LoginModal({ open, onClose }) {
                 placeholder="username"
                 className="w-full rounded-lg border border-white/10 bg-ink-800 px-3 py-2.5 text-sm text-white outline-none focus:border-brand-500"
               />
+              {isRegister && (
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="email"
+                  className="w-full rounded-lg border border-white/10 bg-ink-800 px-3 py-2.5 text-sm text-white outline-none focus:border-brand-500"
+                />
+              )}
               <input
                 type="password"
                 value={password}

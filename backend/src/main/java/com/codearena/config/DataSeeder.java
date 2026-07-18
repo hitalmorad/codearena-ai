@@ -43,12 +43,32 @@ public class DataSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        if (problemRepository.count() > 0) {
-            return;
+        // Seed each area independently so a partial database (e.g. problems
+        // deleted but users kept) is safely and idempotently topped up.
+        if (problemRepository.count() == 0) {
+            seedProblems();
         }
-        seedProblems();
-        seedUsers();
-        seedContest();
+        if (userRepository.count() == 0) {
+            seedUsers();
+        }
+        if (contestRepository.count() == 0) {
+            seedContest();
+        }
+        backfillScores();
+    }
+
+    /**
+     * One-time (idempotent) backfill: accounts created before the weighted
+     * {@code score} existed have score 0 despite a solved count. Give them a
+     * representative score so the global leaderboard ranks them sensibly.
+     */
+    private void backfillScores() {
+        userRepository.findAll().forEach(u -> {
+            if (u.getScore() == 0 && u.getProblemsSolved() > 0) {
+                u.setScore(u.getProblemsSolved() * 25);
+                userRepository.save(u);
+            }
+        });
     }
 
     private void seedProblems() {
@@ -290,25 +310,28 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     private void seedUsers() {
-        createUser("alice", 1485, 9);
-        createUser("bob", 1360, 6);
-        createUser("carol", 1240, 3);
-        createUser("dave", 1180, 1);
+        createUser("alice", "alice@demo.codearena", 1485, 9, 210);
+        createUser("bob", "bob@demo.codearena", 1360, 6, 140);
+        createUser("carol", "carol@demo.codearena", 1240, 3, 70);
+        createUser("dave", "dave@demo.codearena", 1180, 1, 20);
 
-        // Admin account (username: admin, password: from config, role: ADMIN)
+        // Admin account (username: admin, email on the allowlist, role: ADMIN).
         User admin = new User("admin");
+        admin.setEmail("admin@codearena.dev");
         admin.setPasswordHash(PasswordHasher.hash(adminPassword));
         admin.setRole(Role.ADMIN);
         userRepository.save(admin);
     }
 
-    private void createUser(String username, int rating, int solved) {
+    private void createUser(String username, String email, int rating, int solved, int score) {
         User u = new User(username);
+        u.setEmail(email);
         // Demo accounts share the password "password" so they can be logged into.
         u.setPasswordHash(PasswordHasher.hash("password"));
         u.setRole(Role.USER);
         u.setRating(rating);
         u.setProblemsSolved(solved);
+        u.setScore(score);
         userRepository.save(u);
     }
 

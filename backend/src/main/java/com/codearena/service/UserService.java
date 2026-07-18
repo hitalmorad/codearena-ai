@@ -2,6 +2,7 @@ package com.codearena.service;
 
 import com.codearena.dto.LeaderboardEntryDto;
 import com.codearena.model.Problem;
+import com.codearena.model.Role;
 import com.codearena.model.User;
 import com.codearena.realtime.SseHub;
 import com.codearena.repository.UserRepository;
@@ -47,7 +48,8 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public List<LeaderboardEntryDto> leaderboard() {
-        List<User> users = userRepository.findTop100ByOrderByRatingDescProblemsSolvedDescUsernameAsc();
+        // Admins create content but never compete, so they are excluded here.
+        List<User> users = userRepository.findTop100ByRoleOrderByScoreDescProblemsSolvedDescUsernameAsc(Role.USER);
         List<LeaderboardEntryDto> rows = new ArrayList<>(users.size());
         int rank = 1;
         for (User u : users) {
@@ -57,8 +59,10 @@ public class UserService {
     }
 
     /**
-     * Records a first-time solve for global rating. Returns true if this is the
-     * user's first accepted solve of the problem.
+     * Records a first-time solve. Solving grants a hidden problem-solving score
+     * (weighted by difficulty) used for the global leaderboard — it does NOT
+     * change the user's rating. Rating only changes from rated contests.
+     * Returns true if this is the user's first accepted solve of the problem.
      */
     @Transactional
     public boolean applyGlobalSolve(User user, Problem problem) {
@@ -67,7 +71,7 @@ public class UserService {
         }
         user.getSolvedProblemIds().add(problem.getId());
         user.setProblemsSolved(user.getProblemsSolved() + 1);
-        user.setRating(user.getRating() + ratingService.solveReward(problem.getDifficulty()));
+        user.setScore(user.getScore() + ratingService.solveReward(problem.getDifficulty()));
         userRepository.save(user);
         return true;
     }

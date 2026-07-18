@@ -1,15 +1,26 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
-  verifyAdminKey,
   adminCreateProblem,
+  adminUpdateProblem,
+  adminDeleteProblem,
+  adminFetchProblem,
   adminCreateContest,
   fetchProblems,
 } from '../api/client.js'
 import { useUser } from '../context/UserContext.jsx'
 
-const KEY_STORAGE = 'codearena.adminKey'
 const emptyCase = () => ({ input: '', expectedOutput: '', sample: true })
+
+// Downloadable template + shape expected when an admin uploads a test-case file.
+const TESTCASE_TEMPLATE = {
+  testcases: [
+    { input: '2 3', expectedOutput: '5', sample: true },
+    { input: '10 20', expectedOutput: '30', sample: true },
+    { input: '-5 5', expectedOutput: '0', sample: false },
+    { input: '1000000000 1000000000', expectedOutput: '2000000000', sample: false },
+  ],
+}
 
 function Notice({ notice }) {
   if (!notice) return null
@@ -25,68 +36,112 @@ function Notice({ notice }) {
   )
 }
 
-function KeyGate({ onUnlock }) {
-  const [key, setKey] = useState('')
-  const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
+const inputClass =
+  'w-full rounded-lg border border-white/10 bg-ink-800 px-3 py-2 text-sm text-white outline-none focus:border-brand-500'
 
-  async function submit(e) {
-    e.preventDefault()
+function ProblemForm() {
+  const emptyForm = { slug: '', title: '', difficulty: 'EASY', tags: '', timeLimitMs: 2000, memoryLimitMb: 256, description: '' }
+  const [form, setForm] = useState(emptyForm)
+  const [cases, setCases] = useState([emptyCase()])
+  const [notice, setNotice] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [editSlug, setEditSlug] = useState('')
+  const [problems, setProblems] = useState([])
+
+  const refreshProblems = () => fetchProblems().then(setProblems).catch(() => {})
+  useEffect(() => { refreshProblems() }, [])
+
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
+  const setCase = (i, k, v) => setCases((cs) => cs.map((c, j) => (j === i ? { ...c, [k]: v } : c)))
+
+  function resetToCreate() {
+    setEditSlug('')
+    setForm(emptyForm)
+    setCases([emptyCase()])
+    setNotice(null)
+  }
+
+  async function onSelectProblem(slug) {
+    if (!slug) { resetToCreate(); return }
     setBusy(true)
-    setError('')
+    setNotice(null)
     try {
-      await verifyAdminKey(key)
-      localStorage.setItem(KEY_STORAGE, key)
-      onUnlock(key)
-    } catch {
-      setError('Invalid admin key.')
+      const p = await adminFetchProblem(slug)
+      setEditSlug(slug)
+      setForm({
+        slug: p.slug,
+        title: p.title,
+        difficulty: p.difficulty,
+        tags: (p.tags ?? []).join(', '),
+        timeLimitMs: p.timeLimitMs,
+        memoryLimitMb: p.memoryLimitMb,
+        description: p.description,
+      })
+      setCases(
+        p.testcases?.length
+          ? p.testcases.map((c) => ({ input: c.input, expectedOutput: c.expectedOutput, sample: !!c.sample }))
+          : [emptyCase()],
+      )
+    } catch (err) {
+      setNotice({ type: 'err', text: err?.response?.data?.message ?? 'Failed to load problem.' })
     } finally {
       setBusy(false)
     }
   }
 
-  return (
-    <div className="mx-auto max-w-sm px-6 py-24">
-      <div className="border-gradient rounded-2xl glass-strong p-7">
-        <h1 className="font-display text-xl font-bold text-white">Admin access</h1>
-        <p className="mt-1 text-sm text-zinc-400">Enter the admin key to manage problems and contests.</p>
-        <form onSubmit={submit} className="mt-5 space-y-3">
-          <input
-            type="password"
-            value={key}
-            onChange={(e) => setKey(e.target.value)}
-            placeholder="Admin key"
-            className="w-full rounded-lg border border-white/10 bg-ink-800 px-3 py-2.5 text-sm text-white outline-none focus:border-brand-500"
-          />
-          {error && <p className="text-xs text-accent-rose">{error}</p>}
-          <button disabled={busy} className="btn-primary w-full justify-center">
-            {busy ? 'Verifying…' : 'Unlock'}
-          </button>
-        </form>
-      </div>
-    </div>
-  )
-}
+  async function onDelete() {
+    if (!editSlug) return
+    if (!window.confirm(`Delete problem "${editSlug}"? This also removes its submissions.`)) return
+    setBusy(true)
+    setNotice(null)
+    try {
+      await adminDeleteProblem(editSlug)
+      resetToCreate()
+      setNotice({ type: 'ok', text: 'Problem deleted.' })
+      refreshProblems()
+    } catch (err) {
+      setNotice({ type: 'err', text: err?.response?.data?.message ?? 'Failed to delete problem.' })
+    } finally {
+      setBusy(false)
+    }
+  }
 
-const inputClass =
-  'w-full rounded-lg border border-white/10 bg-ink-800 px-3 py-2 text-sm text-white outline-none focus:border-brand-500'
+  function downloadTemplate() {
+    const blob = new Blob([JSON.stringify(TESTCASE_TEMPLATE, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'testcases-template.json'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
-function ProblemForm({ adminKey }) {
-  const [form, setForm] = useState({
-    slug: '',
-    title: '',
-    difficulty: 'EASY',
-    tags: '',
-    timeLimitMs: 2000,
-    memoryLimitMb: 256,
-    description: '',
-  })
-  const [cases, setCases] = useState([emptyCase()])
-  const [notice, setNotice] = useState(null)
-  const [busy, setBusy] = useState(false)
-
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
-  const setCase = (i, k, v) => setCases((cs) => cs.map((c, j) => (j === i ? { ...c, [k]: v } : c)))
+  async function onUploadJson(e) {
+    const file = e.target.files?.[0]
+    e.target.value = '' // let the same file be re-selected later
+    if (!file) return
+    try {
+      const parsed = JSON.parse(await file.text())
+      const arr = Array.isArray(parsed) ? parsed : parsed?.testcases
+      if (!Array.isArray(arr) || arr.length === 0) {
+        throw new Error('expected a "testcases" array')
+      }
+      const mapped = arr.map((c, i) => {
+        if (c?.input == null || c?.expectedOutput == null) {
+          throw new Error(`case ${i + 1} is missing "input" or "expectedOutput"`)
+        }
+        return { input: String(c.input), expectedOutput: String(c.expectedOutput), sample: !!c.sample }
+      })
+      setCases(mapped)
+      const samples = mapped.filter((c) => c.sample).length
+      setNotice({
+        type: 'ok',
+        text: `Loaded ${mapped.length} test case(s): ${samples} sample, ${mapped.length - samples} hidden.`,
+      })
+    } catch (err) {
+      setNotice({ type: 'err', text: `Could not read JSON — ${err.message}.` })
+    }
+  }
 
   async function submit(e) {
     e.preventDefault()
@@ -100,12 +155,21 @@ function ProblemForm({ adminKey }) {
         tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean),
         testcases: cases,
       }
-      await adminCreateProblem(adminKey, payload)
-      setNotice({ type: 'ok', text: `Problem "${form.slug}" created.` })
-      setForm({ slug: '', title: '', difficulty: 'EASY', tags: '', timeLimitMs: 2000, memoryLimitMb: 256, description: '' })
-      setCases([emptyCase()])
+      if (editSlug) {
+        await adminUpdateProblem(editSlug, payload)
+        setEditSlug(form.slug) // slug may have been renamed
+        setNotice({ type: 'ok', text: `Problem "${form.slug}" saved.` })
+      } else {
+        await adminCreateProblem(payload)
+        resetToCreate()
+        setNotice({ type: 'ok', text: `Problem "${payload.slug}" created.` })
+      }
+      refreshProblems()
     } catch (err) {
-      setNotice({ type: 'err', text: err?.response?.data?.message ?? 'Failed to create problem.' })
+      setNotice({
+        type: 'err',
+        text: err?.response?.data?.message ?? (editSlug ? 'Failed to save problem.' : 'Failed to create problem.'),
+      })
     } finally {
       setBusy(false)
     }
@@ -113,7 +177,21 @@ function ProblemForm({ adminKey }) {
 
   return (
     <form onSubmit={submit} className="space-y-4 rounded-2xl glass p-6">
-      <h2 className="font-display text-lg font-semibold text-white">Create problem</h2>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="font-display text-lg font-semibold text-white">
+          {editSlug ? 'Edit problem' : 'Create problem'}
+        </h2>
+        <select
+          className={`${inputClass} max-w-xs`}
+          value={editSlug}
+          onChange={(e) => onSelectProblem(e.target.value)}
+        >
+          <option value="">+ New problem</option>
+          {problems.map((p) => (
+            <option key={p.slug} value={p.slug}>Edit: {p.title}</option>
+          ))}
+        </select>
+      </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <input className={inputClass} placeholder="slug (e.g. two-sum)" value={form.slug} onChange={(e) => set('slug', e.target.value)} required />
         <input className={inputClass} placeholder="Title" value={form.title} onChange={(e) => set('title', e.target.value)} required />
@@ -135,12 +213,26 @@ function ProblemForm({ adminKey }) {
       />
 
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm font-semibold text-brand-400">Test cases</h3>
-          <button type="button" onClick={() => setCases((cs) => [...cs, emptyCase()])} className="btn-ghost !py-1 !text-xs">
-            + Add case
-          </button>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={downloadTemplate} className="btn-ghost !py-1 !text-xs">
+              ⤓ Template
+            </button>
+            <label className="btn-ghost cursor-pointer !py-1 !text-xs">
+              ↑ Upload JSON
+              <input type="file" accept=".json,application/json" onChange={onUploadJson} className="hidden" />
+            </label>
+            <button type="button" onClick={() => setCases((cs) => [...cs, emptyCase()])} className="btn-ghost !py-1 !text-xs">
+              + Add case
+            </button>
+          </div>
         </div>
+        <p className="text-xs text-zinc-500">
+          Add a few <span className="text-zinc-300">sample</span> cases (shown to users) plus any number of
+          hidden cases. Bulk-import them by uploading a JSON file — download the template to see the format.
+          Uploading replaces the cases below.
+        </p>
         {cases.map((c, i) => (
           <div key={i} className="rounded-lg border border-white/5 bg-white/[0.02] p-3">
             <div className="mb-2 flex items-center justify-between">
@@ -166,12 +258,24 @@ function ProblemForm({ adminKey }) {
       </div>
 
       <Notice notice={notice} />
-      <button disabled={busy} className="btn-primary">{busy ? 'Creating…' : 'Create problem'}</button>
+      <div className="flex flex-wrap items-center gap-3">
+        <button disabled={busy} className="btn-primary">
+          {busy ? 'Saving…' : editSlug ? 'Save changes' : 'Create problem'}
+        </button>
+        {editSlug && (
+          <>
+            <button type="button" onClick={resetToCreate} disabled={busy} className="btn-ghost">Cancel</button>
+            <button type="button" onClick={onDelete} disabled={busy} className="ml-auto text-sm text-accent-rose hover:underline">
+              Delete problem
+            </button>
+          </>
+        )}
+      </div>
     </form>
   )
 }
 
-function ContestForm({ adminKey }) {
+function ContestForm() {
   const [problems, setProblems] = useState([])
   const [form, setForm] = useState({ name: '', description: '', start: '', end: '' })
   const [selected, setSelected] = useState(new Set())
@@ -202,7 +306,7 @@ function ContestForm({ adminKey }) {
         endTime: new Date(form.end).toISOString(),
         problemSlugs: [...selected],
       }
-      await adminCreateContest(adminKey, payload)
+      await adminCreateContest(payload)
       setNotice({ type: 'ok', text: `Contest "${form.name}" created.` })
       setForm({ name: '', description: '', start: '', end: '' })
       setSelected(new Set())
@@ -246,49 +350,29 @@ function ContestForm({ adminKey }) {
 }
 
 export default function AdminPage() {
-  const { isAdmin } = useUser()
-  const [adminKey, setAdminKey] = useState(null)
-  const [checking, setChecking] = useState(true)
+  const { user, isAdmin, ready } = useUser()
   const [tab, setTab] = useState('problem')
 
-  useEffect(() => {
-    const saved = localStorage.getItem(KEY_STORAGE)
-    if (!saved) {
-      setChecking(false)
-      return
-    }
-    verifyAdminKey(saved)
-      .then(() => setAdminKey(saved))
-      .catch(() => localStorage.removeItem(KEY_STORAGE))
-      .finally(() => setChecking(false))
-  }, [])
+  if (!ready) return <div className="py-24 text-center text-sm text-zinc-500">Checking access…</div>
 
-  if (checking) return <div className="py-24 text-center text-sm text-zinc-500">Checking access…</div>
-
-  const unlocked = isAdmin || !!adminKey
-  if (!unlocked) return <KeyGate onUnlock={setAdminKey} />
-
-  // Admins authorize via their session token; key users via the stored key.
-  const effectiveKey = adminKey ?? ''
+  if (!isAdmin) {
+    return (
+      <div className="mx-auto max-w-sm px-6 py-24 text-center">
+        <h1 className="font-display text-xl font-bold text-white">Admin only</h1>
+        <p className="mt-2 text-sm text-zinc-400">
+          {user
+            ? 'Your account does not have admin access.'
+            : 'Sign in with an admin account to manage problems and contests.'}
+        </p>
+      </div>
+    )
+  }
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mx-auto max-w-4xl px-6 py-10">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="font-display text-3xl font-bold tracking-tight text-white">Admin</h1>
-          <p className="mt-1 text-sm text-zinc-500">Create practice problems and contests.</p>
-        </div>
-        {!isAdmin && (
-          <button
-            onClick={() => {
-              localStorage.removeItem(KEY_STORAGE)
-              setAdminKey(null)
-            }}
-            className="btn-ghost !py-1.5 !text-sm"
-          >
-            Lock
-          </button>
-        )}
+      <div className="mb-6">
+        <h1 className="font-display text-3xl font-bold tracking-tight text-white">Admin</h1>
+        <p className="mt-1 text-sm text-zinc-500">Create practice problems and contests.</p>
       </div>
 
       <div className="mb-6 inline-flex gap-1 rounded-lg bg-white/[0.03] p-1">
@@ -296,7 +380,7 @@ export default function AdminPage() {
         <button onClick={() => setTab('contest')} className={`rounded-md px-4 py-1.5 text-sm font-medium ${tab === 'contest' ? 'bg-white/10 text-white' : 'text-zinc-400'}`}>Contest</button>
       </div>
 
-      {tab === 'problem' ? <ProblemForm adminKey={effectiveKey} /> : <ContestForm adminKey={effectiveKey} />}
+      {tab === 'problem' ? <ProblemForm /> : <ContestForm />}
     </motion.div>
   )
 }

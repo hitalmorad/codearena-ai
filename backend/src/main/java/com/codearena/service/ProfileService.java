@@ -8,6 +8,7 @@ import com.codearena.model.Submission;
 import com.codearena.model.User;
 import com.codearena.model.Verdict;
 import com.codearena.repository.ProblemRepository;
+import com.codearena.repository.ContestRepository;
 import com.codearena.repository.SubmissionRepository;
 import com.codearena.repository.UserRepository;
 import java.time.Instant;
@@ -31,13 +32,16 @@ public class ProfileService {
     private final UserRepository userRepository;
     private final ProblemRepository problemRepository;
     private final SubmissionRepository submissionRepository;
+    private final ContestRepository contestRepository;
 
     public ProfileService(UserRepository userRepository,
                           ProblemRepository problemRepository,
-                          SubmissionRepository submissionRepository) {
+                          SubmissionRepository submissionRepository,
+                          ContestRepository contestRepository) {
         this.userRepository = userRepository;
         this.problemRepository = problemRepository;
         this.submissionRepository = submissionRepository;
+        this.contestRepository = contestRepository;
     }
 
     @Transactional(readOnly = true)
@@ -57,11 +61,16 @@ public class ProfileService {
         long totalSubmissions = submissionRepository.countByUserId(u.getId());
         long acceptedSubmissions = submissionRepository.countByUserIdAndVerdict(u.getId(), Verdict.ACCEPTED);
 
-        int rank = (int) userRepository.countByRatingGreaterThan(u.getRating()) + 1;
+        int rank = (int) userRepository.countByScoreGreaterThan(u.getScore()) + 1;
         long totalUsers = userRepository.count();
 
+        String memberSince = u.getCreatedAt() == null ? ""
+                : u.getCreatedAt().atZone(ZoneId.systemDefault()).toLocalDate().toString();
+
         return new ProfileDto(
-                u.getUsername(), u.getBio(), u.getRating(), rank, totalUsers,
+                u.getUsername(), u.getBio(), u.getEmail(), u.getRole().name(), memberSince,
+                contestRepository.count(),
+                u.getRating(), rank, totalUsers,
                 solvedEasy, solvedMedium, solvedHard,
                 totalEasy, totalMedium, totalHard,
                 totalSubmissions, acceptedSubmissions);

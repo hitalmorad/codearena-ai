@@ -178,6 +178,38 @@ function StatCard({ label, value, sub }) {
   )
 }
 
+function Detail({ label, value }) {
+  return (
+    <div>
+      <div className="text-xs text-zinc-500">{label}</div>
+      <div className="mt-0.5 break-all text-sm text-zinc-200">{value}</div>
+    </div>
+  )
+}
+
+/** Admin profiles show platform info instead of problem-solving stats. */
+function AdminPanel({ profile }) {
+  const totalProblems = profile.totalEasy + profile.totalMedium + profile.totalHard
+  return (
+    <div className="mb-6 space-y-6">
+      <div className="rounded-2xl glass p-6">
+        <h2 className="mb-4 font-display text-sm font-semibold uppercase tracking-wider text-brand-400">Administrator</h2>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Detail label="Email" value={profile.email || '—'} />
+          <Detail label="Member since" value={profile.memberSince || '—'} />
+          <Detail label="Role" value="ADMIN" />
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-6">
+        <StatCard label="Problems" value={totalProblems} />
+        <StatCard label="Contests" value={profile.totalContests} />
+        <StatCard label="Users" value={profile.totalUsers} />
+      </div>
+      <Link to="/admin" className="btn-primary inline-flex">Open admin panel →</Link>
+    </div>
+  )
+}
+
 function EditModal({ initialBio, onClose, onSaved }) {
   const { applyAuth } = useUser()
   const [bio, setBio] = useState(initialBio ?? '')
@@ -314,6 +346,7 @@ export default function ProfilePage() {
     ? Math.round((profile.acceptedSubmissions / profile.totalSubmissions) * 100)
     : 0
   const isMe = user && user.username === profile.username
+  const isAdmin = profile.role === 'ADMIN'
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="mx-auto max-w-5xl px-6 py-10">
@@ -329,26 +362,46 @@ export default function ProfilePage() {
           <div className="flex items-center gap-2">
             <h1 className="font-display text-2xl font-bold text-white">{profile.username}</h1>
             {isMe && <span className="chip !py-0 text-[10px] text-zinc-300">you</span>}
+            {isAdmin && (
+              <span
+                className="chip !py-0 text-[10px]"
+                style={{ color: '#a78bfa', backgroundColor: '#a78bfa1a', borderColor: '#a78bfa33' }}
+              >
+                ★ ADMIN
+              </span>
+            )}
           </div>
-          <div className="mt-1 text-sm" style={{ color: tier.color }}>{tier.label}</div>
-          <div className="mt-1 text-xs text-zinc-500">
-            Rank <span className="font-semibold text-zinc-300">#{profile.rank}</span> of {profile.totalUsers}
-          </div>
+          {isAdmin ? (
+            <div className="mt-1 text-sm font-medium text-brand-300">Platform Administrator</div>
+          ) : (
+            <>
+              <div className="mt-1 text-sm" style={{ color: tier.color }}>{tier.label}</div>
+              <div className="mt-1 text-xs text-zinc-500">
+                Rank <span className="font-semibold text-zinc-300">#{profile.rank}</span> of {profile.totalUsers}
+              </div>
+            </>
+          )}
           {profile.bio
             ? <p className="mt-2 max-w-xl text-sm text-zinc-400">{profile.bio}</p>
             : isMe && <p className="mt-2 text-sm italic text-zinc-600">No bio yet — add one.</p>}
         </div>
         <div className="flex flex-col items-end gap-2">
-          <div className="text-center">
-            <div className="font-display text-3xl font-bold" style={{ color: tier.color }}>{profile.rating}</div>
-            <div className="text-xs text-zinc-500">rating</div>
-          </div>
+          {!isAdmin && (
+            <div className="text-center">
+              <div className="font-display text-3xl font-bold" style={{ color: tier.color }}>{profile.rating}</div>
+              <div className="text-xs text-zinc-500">rating</div>
+            </div>
+          )}
           {isMe && (
             <button onClick={() => setEditing(true)} className="btn-ghost !py-1.5 !text-xs">Edit profile</button>
           )}
         </div>
       </div>
 
+      {isAdmin && <AdminPanel profile={profile} />}
+
+      {!isAdmin && (
+      <>
       {/* Stats row */}
       <div className="mb-6 grid gap-6 lg:grid-cols-[1.3fr_1fr]">
         <div className="flex items-center gap-6 rounded-2xl glass p-6">
@@ -420,6 +473,8 @@ export default function ProfilePage() {
           )}
         </section>
       </div>
+      </>
+      )}
 
       <AnimatePresence>
         {editing && (

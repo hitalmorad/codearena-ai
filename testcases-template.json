@@ -1,0 +1,9 @@
+{
+  "testcases": [
+    { "input": "2 3", "expectedOutput": "5", "sample": true },
+    { "input": "10 20", "expectedOutput": "30", "sample": true },
+    { "input": "-5 5", "expectedOutput": "0", "sample": false },
+    { "input": "1000000000 1000000000", "expectedOutput": "2000000000", "sample": false },
+    { "input": "3\n1 2 3", "expectedOutput": "6", "sample": false }
+  ]
+}

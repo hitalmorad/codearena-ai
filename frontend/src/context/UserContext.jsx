@@ -38,8 +38,8 @@ export function UserProvider({ children }) {
     return u
   }, [])
 
-  const register = useCallback(async (username, password) => {
-    const u = await authRegister(username.trim(), password)
+  const register = useCallback(async (username, email, password) => {
+    const u = await authRegister(username.trim(), email.trim(), password)
     localStorage.setItem(TOKEN_KEY, u.token)
     setUser(u)
     return u

@@ -1,6 +1,7 @@
 package com.codearena.service;
 
 import com.codearena.dto.AdminContestRequest;
+import com.codearena.dto.AdminProblemDetailDto;
 import com.codearena.dto.AdminProblemRequest;
 import com.codearena.judge.Starters;
 import com.codearena.model.Contest;
@@ -9,7 +10,9 @@ import com.codearena.model.TestCase;
 import com.codearena.repository.ContestEntryRepository;
 import com.codearena.repository.ContestRepository;
 import com.codearena.repository.ProblemRepository;
+import com.codearena.repository.SubmissionRepository;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,13 +23,16 @@ public class AdminService {
     private final ProblemRepository problemRepository;
     private final ContestRepository contestRepository;
     private final ContestEntryRepository contestEntryRepository;
+    private final SubmissionRepository submissionRepository;
 
     public AdminService(ProblemRepository problemRepository,
                         ContestRepository contestRepository,
-                        ContestEntryRepository contestEntryRepository) {
+                        ContestEntryRepository contestEntryRepository,
+                        SubmissionRepository submissionRepository) {
         this.problemRepository = problemRepository;
         this.contestRepository = contestRepository;
         this.contestEntryRepository = contestEntryRepository;
+        this.submissionRepository = submissionRepository;
     }
 
     @Transactional
@@ -37,6 +43,18 @@ public class AdminService {
         Problem p = new Problem();
         applyProblem(p, req);
         return problemRepository.save(p).getId();
+    }
+
+    @Transactional(readOnly = true)
+    public AdminProblemDetailDto getProblem(String slug) {
+        Problem p = problemRepository.findBySlug(slug)
+                .orElseThrow(() -> new ResourceNotFoundException("Problem not found: " + slug));
+        List<AdminProblemDetailDto.CaseDto> cases = p.getTestCases().stream()
+                .sorted(Comparator.comparing(TestCase::getId))
+                .map(tc -> new AdminProblemDetailDto.CaseDto(tc.getInput(), tc.getExpectedOutput(), tc.isSample()))
+                .toList();
+        return new AdminProblemDetailDto(p.getSlug(), p.getTitle(), p.getDifficulty(), p.getDescription(),
+                new ArrayList<>(p.getTags()), p.getTimeLimitMs(), p.getMemoryLimitMb(), cases);
     }
 
     @Transactional
@@ -52,6 +70,8 @@ public class AdminService {
     public void deleteProblem(String slug) {
         Problem p = problemRepository.findBySlug(slug)
                 .orElseThrow(() -> new ResourceNotFoundException("Problem not found: " + slug));
+        // Remove submissions that reference this problem to satisfy foreign keys.
+        submissionRepository.deleteByProblemId(p.getId());
         // Detach from any contests first to avoid FK violations.
         contestRepository.findAll().forEach(c -> {
             if (c.getProblems().removeIf(pr -> pr.getId().equals(p.getId()))) {

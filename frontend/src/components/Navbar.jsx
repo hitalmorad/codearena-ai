@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useUser } from '../context/UserContext.jsx'
 import { ratingTier } from '../lib/rating.js'
@@ -7,6 +7,7 @@ import LoginModal from './LoginModal.jsx'
 
 export default function Navbar() {
   const { pathname } = useLocation()
+  const navigate = useNavigate()
   const { user, logout, isAdmin } = useUser()
   const [loginOpen, setLoginOpen] = useState(false)
 
@@ -37,11 +38,15 @@ export default function Navbar() {
           </Link>
 
           <nav className="hidden items-center gap-7 sm:flex">
-            <Link to="/" className={linkClass(pathname === '/')}>Problems</Link>
-            <Link to="/contests" className={linkClass(pathname.startsWith('/contests'))}>Contests</Link>
-            <Link to="/leaderboard" className={linkClass(pathname === '/leaderboard')}>Leaderboard</Link>
-            <Link to="/interview" className={linkClass(pathname === '/interview')}>Interview</Link>
-            {isAdmin && <Link to="/admin" className={linkClass(pathname === '/admin')}>Admin</Link>}
+            {user && (
+              <>
+                <Link to="/" className={linkClass(pathname === '/')}>Problems</Link>
+                <Link to="/contests" className={linkClass(pathname.startsWith('/contests'))}>Contests</Link>
+                <Link to="/leaderboard" className={linkClass(pathname === '/leaderboard')}>Leaderboard</Link>
+                <Link to="/interview" className={linkClass(pathname === '/interview')}>Interview</Link>
+                {isAdmin && <Link to="/admin" className={linkClass(pathname === '/admin')}>Admin</Link>}
+              </>
+            )}
           </nav>
 
           <div className="flex items-center gap-3">
@@ -60,7 +65,7 @@ export default function Navbar() {
                     {user.rating}
                   </span>
                 </Link>
-                <button onClick={logout} className="btn-ghost !px-2.5 !py-1.5" title="Sign out">
+                <button onClick={() => { logout(); navigate('/') }} className="btn-ghost !px-2.5 !py-1.5" title="Sign out">
                   ⏻
                 </button>
               </div>

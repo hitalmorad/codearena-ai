@@ -32,8 +32,8 @@ api.interceptors.response.use(
 )
 
 // ---------- Auth ----------
-export async function authRegister(username, password) {
-  const { data } = await api.post('/auth/register', { username, password })
+export async function authRegister(username, email, password) {
+  const { data } = await api.post('/auth/register', { username, email, password })
   return data
 }
 
@@ -172,33 +172,34 @@ export function subscribeStream(path, onData) {
   return source
 }
 
-// ---------- Admin (X-Admin-Key header, or the global auth token for admins) ----------
-function adminCfg(key) {
-  return key ? { headers: { 'X-Admin-Key': key } } : {}
-}
-
-export async function verifyAdminKey(key) {
-  const { data } = await api.get('/admin/verify', adminCfg(key))
+// ---------- Admin (authorized via the ADMIN-role session token) ----------
+export async function verifyAdmin() {
+  const { data } = await api.get('/admin/verify')
   return data
 }
 
-export async function adminCreateProblem(key, payload) {
-  const { data } = await api.post('/admin/problems', payload, adminCfg(key))
+export async function adminFetchProblem(slug) {
+  const { data } = await api.get(`/admin/problems/${slug}`)
   return data
 }
 
-export async function adminUpdateProblem(key, slug, payload) {
-  const { data } = await api.put(`/admin/problems/${slug}`, payload, adminCfg(key))
+export async function adminCreateProblem(payload) {
+  const { data } = await api.post('/admin/problems', payload)
   return data
 }
 
-export async function adminDeleteProblem(key, slug) {
-  const { data } = await api.delete(`/admin/problems/${slug}`, adminCfg(key))
+export async function adminUpdateProblem(slug, payload) {
+  const { data } = await api.put(`/admin/problems/${slug}`, payload)
   return data
 }
 
-export async function adminCreateContest(key, payload) {
-  const { data } = await api.post('/admin/contests', payload, adminCfg(key))
+export async function adminDeleteProblem(slug) {
+  const { data } = await api.delete(`/admin/problems/${slug}`)
+  return data
+}
+
+export async function adminCreateContest(payload) {
+  const { data } = await api.post('/admin/contests', payload)
   return data
 }
 

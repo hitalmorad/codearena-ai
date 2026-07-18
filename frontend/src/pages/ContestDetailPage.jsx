@@ -36,7 +36,7 @@ function Countdown({ end }) {
 
 export default function ContestDetailPage() {
   const { id } = useParams()
-  const { user } = useUser()
+  const { user, isAdmin } = useUser()
   const [contest, setContest] = useState(null)
   const [standings, setStandings] = useState([])
   const [status, setStatus] = useState('loading')
@@ -122,6 +122,8 @@ export default function ContestDetailPage() {
         <div>
           {!user ? (
             <span className="text-sm text-zinc-500">Sign in to join.</span>
+          ) : isAdmin ? (
+            <span className="chip !text-accent-amber text-xs">Admins can’t join contests</span>
           ) : contest.registered ? (
             <span className="chip !text-accent-emerald">✓ Registered</span>
           ) : (
